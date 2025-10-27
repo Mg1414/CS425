@@ -1,0 +1,127 @@
+
+
+TCP 3-Way Handshake using Raw Sockets in C++
+
+Authors:
+
+Baviskar Prathamesh Pravin, 220276
+
+Ayushmaan Jai Singh, 220286
+
+Mayank Gupta, 220638
+
+/////
+
+Structure:
+- client.cpp — Initiates the TCP handshake by sending a SYN packet.
+- server.cpp — Listens for the SYN packet and replies with a SYN-ACK.
+- Makefile   — Contains build and execution rules.
+
+Build Commands:
+  make          # Builds both server and client executables
+  make server   # Builds only the server
+  make client   # Builds only the client
+
+Run Commands:
+  make run-server   # Runs the compiled server executable
+  make run-client   # Runs the compiled client executable
+
+Clean Build Files:
+  make clean        # Removes server and client binaries
+
+Requirements:
+- Linux system (required for raw socket access)
+- Root privileges (run with sudo)
+- g++ compiler with C++17 support
+
+/////
+
+
+Introduction:
+This project implements a low-level TCP 3-way handshake using raw sockets in C++. It consists of two components:
+
+client.cpp — Initiates the connection using a SYN packet.
+
+server.cpp — Listens for incoming SYN packets and responds with a SYN-ACK.
+
+Working of TCP 3-Way Handshake:
+
+Step 1: Client sends SYN
+
+A raw TCP packet is crafted with only the SYN flag set.
+
+Function used: send_tcp_packet()
+
+Key fields:
+
+tcp->syn = 1
+
+tcp->seq = 200
+
+IP and TCP checksums are calculated manually using a pseudo-header.
+
+Step 2: Server responds with SYN-ACK
+
+The server receives the SYN and responds with a SYN-ACK packet.
+
+Key response fields:
+
+tcp->syn = 1
+
+tcp->ack = 1
+
+tcp->seq = 400
+
+tcp->ack_seq = 201
+
+Step 3: Client sends ACK
+
+The client sends the final ACK to complete the handshake.
+
+Key fields:
+
+tcp->syn = 0
+
+tcp->ack = 1
+
+tcp->seq = 600
+
+tcp->ack_seq = 401
+
+The server logs handshake completion.
+
+Client Code Overview (client.cpp):
+
+Uses socket(AF_INET, SOCK_RAW, IPPROTO_TCP) to create a raw socket.
+
+IP_HDRINCL is set to allow manual IP header construction.
+
+Sends crafted TCP packets using sendto().
+
+Waits for SYN-ACK and sends final ACK.
+
+Server Code Overview (server.cpp):
+
+Listens for incoming TCP packets on a raw socket.
+
+Responds to SYN with SYN-ACK.
+
+Waits for final ACK to complete handshake.
+
+Sample Output:
+Client side:
+SYN response with sequence number 200 being sent
+SYN-ACK sent from server to client
+ACK response with sequence number 600 and ack_seq, 401 being sent
+handshake was successful
+
+Server side:
+TCP Flags:  SYN: 1 ACK: 0 FIN: 0 RST: 0 PSH: 0 SEQ: 200
+Received SYN from 127.0.0.1
+Sent SYN-ACK
+TCP Flags:  SYN: 0 ACK: 1 FIN: 0 RST: 0 PSH: 0 SEQ: 600
+Received ACK, handshake complete.
+
+Conclusion:
+This implementation provides an in-depth view of the TCP handshake process by manually constructing packets. It bypasses high-level socket APIs to show the inner workings of TCP/IP communication.
+
