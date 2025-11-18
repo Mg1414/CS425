@@ -1,0 +1,810 @@
+CS425 COMPUTER NETWORKS – SUPER KID‑FRIENDLY HANDBOOK 🌐💬🐙
+============================================================
+
+Hi little genius! 🤓✨
+
+This is your *story book* for the CS425 Computer Networks project.
+It is written so that even a 5‑year‑old (a **very smart** one 😄) can
+understand it.
+
+It is ALSO your secret weapon for interviews later. 🕵️‍♂️
+If you read this carefully, you will be able to explain:
+
+- How you built an **EPOLL‑based group chat server** in C++ 💬
+- How you wrote **iterative and recursive DNS resolvers** in Python 🌍
+- How you did a **TCP 3‑way handshake with raw sockets** in C++ 🤝
+- How you simulated **distance‑vector and link‑state routing** 🗺️
+
+We will:
+- Explain all big words using simple stories and emojis 😊
+- Explain WHY you chose each technique 🧠
+- Guess what interviewers may ask 😈 and give you answers
+- Guess what a curious 5‑year‑old may ask 😺 and answer those too
+
+Let’s go one assignment at a time. 🚀
+
+------------------------------------------------------------
+INDEX 📚
+------------------------------------------------------------
+1. Super simple network basics 🧱
+2. A1 – Multi‑client chat server (epoll, TCP) 💬
+3. A2 – DNS resolver (iterative & recursive) 🌐
+4. A3 – TCP 3‑way handshake with raw sockets 🤝
+5. A4 – Routing simulation (distance vector & link state) 🗺️
+6. Common interview Q&A (for your resume bullets) 🎯
+
+============================================================
+1. SUPER SIMPLE NETWORK BASICS 🧱
+============================================================
+
+Before we talk about your assignments, let’s learn some basic words.
+
+----------------------------------------
+1.1 What is a COMPUTER NETWORK? 🌐
+----------------------------------------
+
+Imagine many computers are friends.
+They are all connected with invisible wires (or Wi‑Fi). 📶
+They pass messages to each other:
+- Like letters 📬
+- But super fast ⚡
+
+That collection of connected computers is called a **network**.
+The Internet is a HUGE network of networks.
+
+----------------------------------------
+1.2 What is a SOCKET? 🔌
+----------------------------------------
+
+Imagine your computer has many “ports” like holes in a wall. ⚡
+A **socket** is like plugging a phone into one of those ports.
+
+- You create a socket in code → like picking up a telephone 📞
+- You connect it to another computer’s socket → now you can talk 🤝
+
+In C++/C, you call `socket()`, `connect()`, `send()`, `recv()`.
+
+----------------------------------------
+1.3 What is TCP vs UDP? 📦
+----------------------------------------
+
+TCP (Transmission Control Protocol) – "careful postman" 📮
+- Makes sure every packet arrives.
+- Puts packets in order.
+- If something is lost, it tries again.
+- Good for chat, web pages, etc.
+
+UDP (User Datagram Protocol) – "fast but lazy postman" 🏃‍♂️
+- Sends packets and doesn’t check if they arrive.
+- No order guarantee.
+- Good for video streaming or games where speed matters more.
+
+----------------------------------------
+1.4 What is a CLIENT and what is a SERVER? 👥
+----------------------------------------
+
+CLIENT 👦:
+- Asks for something ("Please send me messages!").
+
+SERVER 👨‍💻:
+- Listens on a port.
+- Accepts connections.
+- Sends back data.
+
+For your chat:
+- server_grp.cpp (server side, described in A1 PDF) 🖥️
+- client_grp.cpp (client side) 💻
+
+----------------------------------------
+1.5 What is EPOLL? 👂
+----------------------------------------
+
+This is important! It’s in your resume. 💼
+
+Imagine you are a teacher 👩‍🏫 with 100 kids.
+You want to know when any kid raises their hand. ✋
+
+Option 1: Ask each kid every second:
+- "Are you raising your hand now?" (polling)
+- Very tiring, wasteful.
+
+Option 2: Tell kids:
+- "If you need me, ring a bell."
+- You sit and **wait for events** (like bells). 🔔
+
+**epoll** is like Option 2.
+- You give epoll a list of sockets.
+- epoll tells you which socket has data ready.
+- You don’t need 100 threads; **one thread** can handle many clients.
+
+So epoll = an efficient **event‑driven** I/O system for Linux.
+
+============================================================
+2. A1 – MULTI‑CLIENT CHAT SERVER (EPOLL, TCP) 💬
+============================================================
+
+Resume bullet:  
+> Developed a multi-client chat server in C++ with an
+> event-driven architecture using epoll.
+
+Let’s explain the project like a story. 📖
+
+----------------------------------------
+2.1 Story of the Chat Server 🏫
+----------------------------------------
+
+Imagine a big classroom chat: many students (clients) talk to a
+teacher (server). They can:
+- Send messages to everyone (broadcast) 📢
+- Send private messages 🤫
+- Create and join groups 👥
+
+We want:
+- ONE server handling MANY clients.
+- No threads (or minimal threads) by using epoll.
+- Users to log in with username + password.
+- Simple commands like:
+  - `/msg alice hello`
+  - `/broadcast hi all`
+  - `/create group1`
+  - `/join group1`
+  - `/leave group1`
+
+----------------------------------------
+2.2 Server side (server_grp.cpp – from A1 description) 🖥️
+----------------------------------------
+
+You described the main pieces in server_grp.cpp:
+
+1️⃣ Handling Ctrl+C signal ✋
+- When you press Ctrl+C, the server should close sockets nicely and
+  exit.
+
+2️⃣ Stripping spaces and newlines ✂️
+- Incoming messages may have extra spaces or `\n`.
+- A helper function cleans up the string.
+
+3️⃣ Sending messages to a client 📤
+- A helper `send_message(fd, "text")` wraps `send()`.
+
+4️⃣ Getting IP address from a socket 🌍
+- For logging, you get the client IP from `sockaddr`.
+
+5️⃣ ChatServer constructor / initialization 🏗️
+- Create a listening TCP socket.
+- Set it to non‑blocking.
+- Bind to `0.0.0.0:port`.
+- `listen()` for incoming connections.
+- Create an **epoll instance**.
+- Add the listening socket to epoll.
+
+6️⃣ Set listener and clients to non‑blocking 🚫⏱️
+- Non‑blocking means: `read()` and `write()` never make you wait
+  forever; if there’s no data, they return quickly.
+- This is necessary for epoll event‑driven architecture.
+
+7️⃣ Handling new connections 👋
+- When epoll says "hey, listening socket is ready", that means a new
+  client wants to connect.
+- Server calls `accept()`.
+- Makes this new client socket non‑blocking.
+- Adds it to epoll.
+
+8️⃣ Managing sessions & authentication 🔐
+- The server keeps a tiny "session state" for each client fd:
+  - Is this client authenticated?
+  - What is the username?
+  - What groups are they in?
+- On first connection, server sends:
+  - `Enter username:`
+  - `Enter password:`
+- It checks `users.txt` (or some map) to verify creds.
+- If wrong → "Authentication failed" and close socket.
+- If correct → "Welcome" and mark session as authenticated.
+
+9️⃣ Handling client messages ✉️
+- After authentication, when epoll signals this client’s fd is ready:
+  - Read from socket into buffer.
+  - If `recv` returns 0 or error → client disconnected, clean up.
+  - Else parse the line:
+    - If it starts with `/` → treat as a command (create/join/leave,
+      private msg, broadcast, group msg).
+    - Else: maybe send as a normal chat message.
+
+🔟 Broadcast & group messages 📢
+- Broadcast:
+  - Server loops over all connected clients.
+  - Sends message to everyone, except maybe the sender.
+- Group messages:
+  - Server stores a map of `group_name -> set of fds`.
+  - When a message comes to a group, it sends to all group members.
+
+----------------------------------------
+2.3 Client side (client_grp.cpp) 💻
+----------------------------------------
+
+We DO have this file; let’s describe it.
+
+Key ideas:
+
+1️⃣ Create a TCP socket 🔌
+- `socket(AF_INET, SOCK_STREAM, 0)` → TCP.
+
+2️⃣ Connect to server 🔗
+- Fill `server_address` with IP (127.0.0.1) and port (e.g., 12345).
+- Call `connect()`.
+
+3️⃣ Authentication dialogue 🔐
+- Receive "Enter username".
+- Read username from `std::cin` and send.
+- Receive "Enter password".
+- Send password.
+- Receive result: "Authentication failed" or "Welcome".
+
+4️⃣ Start a receiving thread 🧵
+- `handle_server_messages` runs in another thread.
+- It loops:
+  - `recv()` from server.
+  - If 0 → server disconnected.
+  - Else → print message.
+
+   This means the client can BOTH:
+   - Read new messages from server.
+   - Accept user input at the same time.
+
+5️⃣ Main thread sends messages 💬
+- Loop reading user input.
+- `send()` each line to server.
+- If message is `/exit`, close socket and break.
+
+----------------------------------------
+2.4 Why EPOLL and EVENT‑DRIVEN? 🤔
+----------------------------------------
+
+**Child question:**
+> Why not just use threads, one per client? 🤷‍♂️
+
+- Threads are like many people working at once.
+- For 2–3 clients, it’s fine.
+- For 1000 clients, threads are heavy:
+  - More memory
+  - More context switching
+
+**epoll** is event‑driven:
+- One thread waits for events.
+- When some socket has data, epoll wakes us and says "this fd is
+  ready".
+
+So epoll is:
+- Efficient ✅
+- Scalable ✅
+- No need to create 1000 threads ✅
+
+**Interview answer:**
+> I used epoll to implement an event-driven server that can handle
+> many simultaneous TCP clients in a single thread. This reduces
+> overhead versus thread-per-connection and is a standard Linux
+> pattern for high-scale servers.
+
+----------------------------------------
+2.5 Likely interview questions (A1) 🎯
+----------------------------------------
+
+Q1: How does epoll-based event-driven architecture work in your chat
+    server?
+A1: I create a non-blocking listening socket and an epoll instance,
+    add the listening socket to epoll, and then loop on `epoll_wait`.
+    When `epoll_wait` returns, I check which file descriptors are
+    ready. If it’s the listening socket, I accept new clients; if it’s
+    a client socket, I read data, parse commands, and send responses.
+
+Q2: How do you manage client state without threads?
+A2: I maintain a session struct per client fd (username, auth status,
+    groups, etc.) in a map. Every time epoll says that fd is ready,
+    I look up its session and handle the message in that context.
+
+Q3: How do you implement private messages vs broadcast vs group
+    messages?
+A3: For private messages, I map username → file descriptor and send
+    only to that fd. For broadcast, I loop over all authenticated
+    sessions and send the message. For group messages, I maintain a
+    `group_name -> set of fds` mapping and send to that set.
+
+Q4: How do you handle a client disconnecting?
+A4: If `recv` returns 0 or an error, I remove the client fd from epoll,
+    close the socket, and erase its session and group memberships.
+
+Q5: Why did you choose TCP instead of UDP for the chat?
+A5: Chat needs reliable delivery; messages must arrive and be in
+    order. TCP guarantees reliable, ordered data, so it’s more
+    appropriate than UDP for this use case.
+
+============================================================
+3. A2 – DNS RESOLVER (ITERATIVE & RECURSIVE) 🌐
+============================================================
+
+Resume bullet:  
+> Implemented an iterative and recursive DNS resolver in Python.
+
+----------------------------------------
+3.1 What is DNS? 🧭
+----------------------------------------
+
+DNS (Domain Name System) is the "phone book" of the Internet. ☎️
+
+- We remember names: `www.google.com`.
+- Computers use IP addresses: `142.250.183.196`.
+- DNS translates names → IPs.
+
+When you type `www.iitk.ac.in` in a browser:
+- Your computer asks a DNS resolver:
+  - "Hey, what is the IP for this name?"
+
+----------------------------------------
+3.2 Iterative vs Recursive DNS 🔁
+----------------------------------------
+
+Imagine you want to find a book in a huge library. 📚
+
+**Recursive**:
+- You ask the librarian.
+- The librarian goes up floors, asks other librarians, searches, and
+  comes back with the answer.
+- You only asked once.
+
+**Iterative**:
+- You go step by step.
+- First you ask at the entrance: "Where is the floor for large
+  domains?".
+- They say: "Go to floor ROOT".
+- There you ask: "Where is .com?".
+- They say: "Go to the .com desk".
+- You then ask .com: "Where is google.com?".
+- They say: "Ask ns1.google.com".
+- You ask ns1.google.com and finally get the IP.
+
+In your code:
+- **Iterative resolver**: YOU do the step-by-step walking.
+- **Recursive resolver**: You ask the system’s resolver (or public
+  resolver) and it does the walking for you.
+
+----------------------------------------
+3.3 Your A2 code (dnsresolver.py) 🐍
+----------------------------------------
+
+You use the "dnspython" library.
+
+Important pieces:
+
+1️⃣ ROOT_SERVERS 🌍
+- A dictionary of some root DNS server IPs.
+- These are like the very top librarians.
+
+2️⃣ send_dns_query(server, domain)
+- Builds a DNS query message asking for A records (IPv4 addresses).
+- Sends it to the given server (TODO in the template is to actually
+  use `dns.query.udp`).
+- Returns the response or None on error.
+
+3️⃣ extract_next_nameservers(response)
+- Looks into the AUTHORITY section of the response.
+- Collects **NS records** (names of nameservers).
+- Then resolves those NS hostnames to their IP addresses.
+- Returns a list of next nameserver IPs.
+
+4️⃣ iterative_dns_lookup(domain)
+- Start with `next_ns_list = ROOT_SERVERS.keys()`.
+- Stage = "ROOT".
+- While next_ns_list not empty:
+  - Take first ns_ip.
+  - Call send_dns_query(ns_ip, domain).
+  - If answer section present → print IP and return.
+  - Else → call extract_next_nameservers() to get next NS list.
+  - Move stage from ROOT → TLD → AUTH (Top Level Domain → final).
+
+5️⃣ recursive_dns_lookup(domain)
+- Uses `dns.resolver.resolve(domain, "A")`.
+- That call uses your system resolver which does recursion.
+- Loops over answers and prints them.
+
+----------------------------------------
+3.4 Why implement both iterative and recursive? 🤔
+----------------------------------------
+
+- Iterative shows you **how DNS really works** step by step.
+- Recursive shows you the **easy user interface** most clients use.
+
+Interview answer:
+> I implemented both resolvers to understand the full DNS resolution
+> path. The iterative resolver manually walks from root servers to
+> TLD and authoritative servers, while the recursive resolver uses the
+> system resolver. This demonstrates my understanding of DNS
+> hierarchy, NS records, and the difference between client-side and
+> server-side recursion.
+
+----------------------------------------
+3.5 Likely interview questions (A2) 🎯
+----------------------------------------
+
+Q1: Explain iterative vs recursive DNS resolution.
+A1: In iterative DNS, the resolver itself walks through the DNS
+    hierarchy: root → TLD → authoritative, fetching referrals at each
+    step. In recursive DNS, the resolver delegates that walking to
+    another resolver (like your ISP’s or a public one), which returns
+    the final answer.
+
+Q2: What are NS records and how did you use them?
+A2: NS records list the names of authoritative nameservers for a
+    domain. In my iterative resolver, I parse NS records from the
+    authority section of a DNS response, then resolve their IPs to get
+    the next servers to query.
+
+Q3: Why did you store a list of root servers?
+A3: DNS resolution must start somewhere. Root servers know where to
+    find the TLD servers (.com, .org, .in, etc.). I used a small set
+    of root server IPs as starting points for iterative lookup.
+
+Q4: How do you handle timeouts or unreachable servers?
+A4: `send_dns_query` wraps the query in a try/except block. If an
+    exception occurs (timeout, unreachable server), it returns None,
+    and the main loop can either retry a different server or stop with
+    an error.
+
+============================================================
+4. A3 – TCP 3‑WAY HANDSHAKE WITH RAW SOCKETS 🤝
+============================================================
+
+Resume bullet:  
+> Performed a low-level TCP 3-way handshake using raw sockets
+> in C++, manually crafting SYN, SYN-ACK, and ACK packets.
+
+----------------------------------------
+4.1 What is the TCP 3‑way handshake? 🤝
+----------------------------------------
+
+When two computers want to talk over TCP, they do a dance:
+
+1️⃣ SYN – Client → Server:  
+   "Hi, I want to start a connection."
+
+2️⃣ SYN‑ACK – Server → Client:  
+   "Hi, I heard you, and I’m ready."
+
+3️⃣ ACK – Client → Server:  
+   "Great, I confirm. Let’s talk!"
+
+After this, the connection is established.
+The OS kernel usually does this automatically for you.
+
+In this assignment, you **manually build** the packets. 🤯
+
+----------------------------------------
+4.2 Raw sockets 🧱
+----------------------------------------
+
+Usually, when we use TCP in C++:
+- We call `socket(AF_INET, SOCK_STREAM, 0)`.
+- Kernel manages TCP handshake for us.
+
+With **raw sockets**:
+- We call `socket(AF_INET, SOCK_RAW, IPPROTO_TCP)`.
+- We send and receive raw IP packets, including IP and TCP headers.
+- We must fill in fields ourselves: ports, flags, seq numbers.
+
+This is low‑level and powerful. 💪
+
+----------------------------------------
+4.3 Server.cpp (A3) 🖥️
+----------------------------------------
+
+Important parts:
+
+1️⃣ `print_tcp_flags`
+- Reads flags from `struct tcphdr`:
+  - SYN, ACK, FIN, RST, PSH, SEQ number.
+- Prints them.
+
+2️⃣ `send_syn_ack`
+- Builds a packet: IP header + TCP header.
+- IP header fields:
+  - version = 4 (IPv4)
+  - ihl = 5
+  - tot_len = len of entire packet
+  - protocol = IPPROTO_TCP
+  - saddr = client IP (so, we act like server at 127.0.0.1)
+  - daddr = 127.0.0.1 (server address)
+- TCP header fields:
+  - source = tcp->dest (server port)
+  - dest = tcp->source (client port)
+  - seq = some sequence number (400)
+  - ack_seq = client_seq + 1
+  - syn = 1, ack = 1
+- Sends packet using `sendto`.
+
+3️⃣ `receive_syn`
+- Creates raw socket.
+- Enables IP_HDRINCL (so we include IP header manually).
+- Loop `recvfrom` into buffer.
+- Parse IP header, then TCP header.
+- Filter by destination port == 12345.
+- If `syn=1, ack=0, seq=200` → treat as SYN.
+- Send SYN‑ACK using `send_syn_ack`.
+- If later `ack=1, syn=0, seq=600` → treat as final ACK and finish.
+
+4️⃣ `main`
+- Prints that server is listening.
+- Calls `receive_syn()`.
+
+----------------------------------------
+4.4 What about the CLIENT side? 👦
+----------------------------------------
+
+There is also a client program (client.cpp) in the assignment (not
+shown here) that:
+- Constructs and sends a SYN packet.
+- Waits for SYN‑ACK.
+- Sends ACK.
+
+This simulates the 3‑way handshake fully using raw sockets.
+
+----------------------------------------
+4.5 Why do this with raw sockets? 🤔
+----------------------------------------
+
+Normally we **never** do this in applications.
+The OS handles TCP handshake.
+
+But for learning:
+- It shows exactly how TCP headers and flags work.
+- You see IP header + TCP header in memory.
+- You understand sequence numbers and ACK numbers.
+
+Interview answer:
+> I implemented the TCP three-way handshake over raw sockets to
+> understand TCP at the packet level. I manually crafted SYN,
+> SYN-ACK, and ACK packets, filled IP and TCP headers, and used
+> sequence and acknowledgment numbers correctly. This demonstrates
+> low-level networking skills beyond typical socket programming.
+
+----------------------------------------
+4.6 Likely interview questions (A3) 🎯
+----------------------------------------
+
+Q1: Explain the TCP three-way handshake.
+A1: The client sends a SYN to start the connection. The server replies
+    with SYN-ACK to acknowledge and agree. The client sends a final
+    ACK confirming receipt. After that the connection is established.
+
+Q2: What is a raw socket and why use IP_HDRINCL?
+A2: A raw socket allows me to send/receive packets including protocol
+    headers. With IP_HDRINCL, the kernel expects the user to supply
+    the IP header; this is necessary when crafting custom IP packets.
+
+Q3: How do you compute the TCP checksum?
+A3: (If implemented) The checksum is calculated over the TCP header
+    and payload plus a pseudo-header derived from source/destination
+    IP addresses. In some setups, we can set it to 0 and let the
+    kernel compute it, or implement our own checksum function.
+
+Q4: What is the purpose of sequence and acknowledgment numbers?
+A4: Sequence numbers tell the other side where in the byte stream this
+    segment starts. ACK numbers tell the sender which bytes have been
+    received. They help ensure ordered, reliable delivery.
+
+============================================================
+5. A4 – ROUTING SIMULATION (DISTANCE VECTOR & LINK STATE) 🗺️
+============================================================
+
+Now A4 – routing_sim.cpp.
+
+You simulate:
+- Distance Vector Routing (DVR) 📍
+- Link State Routing (LSR) 🧭
+
+----------------------------------------
+5.1 What is ROUTING? 🚗
+----------------------------------------
+
+Imagine you want to send a letter from city A to city Z.
+There are many cities and roads.
+You want the best path (maybe the shortest).
+
+Routers on the Internet do this for packets.
+- They decide which neighbor to send the packet to next.
+- They use **routing algorithms**.
+
+Two famous families:
+- Distance Vector (like Bellman‑Ford) 🧮
+- Link State (like Dijkstra) 🧠
+
+----------------------------------------
+5.2 Input Graph 🧱
+----------------------------------------
+
+Your `routing_sim.cpp` reads a file like input1.txt:
+- First number: n (number of nodes).
+- Then n×n matrix of costs.
+  - graph[i][j] = cost to go from node i to j.
+  - INF (9999) means no direct link.
+
+----------------------------------------
+5.3 Distance Vector Routing (simulateDVR) 📍
+----------------------------------------
+
+In DVR, each router only knows:
+- Cost to its neighbors.
+- Each router keeps a "distance vector" to all destinations.
+
+Routers periodically:
+- Send their distance vector to neighbors.
+- Update their own vector by Bellman‑Ford formula:
+
+  dist[i][j] = min over k ( cost(i,k) + dist[k][j] )
+
+In your code (TODO section in simulateDVR):
+- `dist` starts as `graph`.
+- `nextHop[i][j]` holds the next node to go from i to reach j.
+- You would run a loop until no changes:
+  - for each pair (i, j):
+    - try going through neighbors k.
+    - if `dist[i][k] + dist[k][j] < dist[i][j]`, update dist and
+      nextHop.
+
+`printDVRTable` prints:
+- For each node i:
+  - dest, cost, next hop.
+
+So you see each node’s routing table after convergence.
+
+----------------------------------------
+5.4 Link State Routing (simulateLSR) 🧭
+----------------------------------------
+
+In LSR, each router:
+- Knows the whole graph (or at least all links).
+- Runs a shortest path algorithm (Dijkstra) to all nodes.
+
+In your code simulateLSR:
+- For each source `src`:
+  - Set dist[src] = 0, others = INF.
+  - Use a priority queue (or simple loops) to always pick the
+    unvisited node with smallest distance.
+  - Relax edges: if going `src -> ... -> u -> v` is cheaper, update
+    dist[v] and prev[v].
+
+`printLSRTable` finds the next hop from src to each dest i:
+- Follows `prev` chain backward from dest to src.
+- The neighbor just after src is the **next hop**.
+
+So LSR shows each node’s table using global graph knowledge.
+
+----------------------------------------
+5.5 Why simulate both DVR and LSR? 🤔
+----------------------------------------
+
+They are two fundamental routing styles used in real networks:
+- DVR → used in RIP (Routing Information Protocol).
+- LSR → used in OSPF (Open Shortest Path First).
+
+By simulating both, you show that you understand:
+- How routing tables get built.
+- Difference between "local neighbor info + updates" (DVR) and
+  "global map + shortest path algorithm" (LSR).
+
+Interview answer:
+> In A4, I built a routing simulator that can run both distance vector
+> and link state algorithms over a given topology. For DVR, each node
+> iteratively updates its distance vector using a Bellman-Ford style
+> update. For LSR, each node runs Dijkstra’s algorithm on the global
+> topology to compute its shortest paths. The resulting tables show
+> next-hop and cost from every node to every other node.
+
+----------------------------------------
+5.6 Likely interview questions (A4) 🎯
+----------------------------------------
+
+Q1: Explain the difference between distance vector and link state
+    routing.
+A1: Distance vector uses local information and exchanges vectors with
+    neighbors; nodes only know the cost to destinations, not the whole
+    map. Link state floods link information so every node learns the
+    full topology and runs a shortest path algorithm like Dijkstra.
+
+Q2: What is count-to-infinity problem in DVR?
+A2: It’s a problem where bad news (like a link failure) spreads slowly
+    and nodes keep increasing distance estimates step by step, taking
+    a long time to converge. There are fixes like split horizon.
+
+Q3: Why does LSR converge faster than DVR?
+A3: In LSR, once each node has the full topology, running Dijkstra
+    gives correct routes in one pass. DVR relies on iterative
+    exchanges and can take longer, especially with loops.
+
+============================================================
+6. COMMON RESUME BULLET Q&A 🎯
+============================================================
+
+Your resume bullets for this course were:
+
+1) "Developed a multi-client chat server in C++ with an
+   event-driven architecture using epoll."
+2) "Implemented an iterative and recursive DNS resolver in Python."
+3) "Performed a low-level TCP 3-way handshake using raw sockets
+   in C++, manually crafting SYN, SYN-ACK, and ACK packets."
+
+Here are compact answers you can reuse.
+
+----------------------------------------
+6.1 Bullet 1 – Chat server with epoll 💬
+----------------------------------------
+
+Q: What did you build?
+A: I built a TCP chat server in C++ that can handle multiple clients
+   simultaneously without using one thread per client. It uses epoll
+   to be event-driven: a single loop waits for socket events and then
+   reads/writes as needed. The server supports authentication, private
+   messages, broadcasts, and group messaging.
+
+Q: Why epoll?
+A: epoll is efficient for many concurrent connections. Instead of
+   blocking on one socket or spawning a thread per client, I register
+   all sockets with epoll and use `epoll_wait` to find which are
+   ready. This reduces overhead and is a standard pattern in Linux
+   high-concurrency servers.
+
+Q: How do you store session state?
+A: I use a map from file descriptor to a session struct (or equivalent
+   data) containing username, authentication status, and group
+   memberships. When an event arrives for a descriptor, I look up its
+   session and process the message accordingly.
+
+----------------------------------------
+6.2 Bullet 2 – Iterative & recursive DNS resolver 🌐
+----------------------------------------
+
+Q: What is the difference between your iterative and recursive
+   resolvers?
+A: The iterative resolver manually walks the DNS hierarchy, starting
+   from root servers, following NS records to TLD and authoritative
+   servers until it finds an A record. The recursive resolver uses
+   `dns.resolver.resolve`, which relies on a system or upstream
+   resolver to do recursion internally, so my code just asks once and
+   gets the final answer.
+
+Q: Why is implementing an iterative resolver useful?
+A: It forces you to understand how DNS is structured: root servers,
+   TLDs, authority, NS records, additional sections, and how referrals
+   work. It demystifies what normally happens behind the scenes.
+
+----------------------------------------
+6.3 Bullet 3 – Raw-socket TCP handshake 🤝
+----------------------------------------
+
+Q: What did you implement exactly?
+A: I used raw sockets in C++ to manually construct and send TCP
+   packets for a three-way handshake: a SYN from the client, a
+   SYN-ACK from the server, and a final ACK from the client. I filled
+   the IP and TCP headers manually, including sequence and
+   acknowledgment numbers, and watched the handshake complete.
+
+Q: Why is that impressive?
+A: Most developers only use high-level sockets and never see raw TCP
+   headers. Building the handshake at the packet level shows
+   understanding of IP, TCP headers, flags, sequence numbers, and how
+   the OS normally abstracts these details away.
+
+============================================================
+7. HOW TO STUDY THIS FILE BEFORE INTERVIEWS 📖
+============================================================
+
+1) Read section 1 (big words) until you can explain each term out
+   loud to a small child.
+2) For each assignment section (2,3,4,5), imagine the interviewer
+   asking "What did you do?" and answer with the story.
+3) Practice the Q&A at the end of each section.
+4) Finally, read section 6 and memorize the short bullet answers.
+
+If you can do that, you will be ready to defend **every word** of your
+CS425 resume bullets with confidence, in language clear enough for a
+5‑year‑old… and impressive enough for any interviewer. 😄🚀
+
